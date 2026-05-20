@@ -15,29 +15,42 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    const { messages } = JSON.parse(event.body);
     const apiKey = process.env.GEMINI_API_KEY;
 
+    if (!apiKey) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: "API key not configured on server. Please contact admin." }),
+      };
+    }
+
+    const body = JSON.parse(event.body);
+    const messages = body.messages || [];
+
     const contents = [];
-    for (const msg of messages) {
+    const systemPrompt = "You are Loomix AI, an advanced intelligent assistant. You are helpful, knowledgeable, creative, and conversational. Never mention Gemini, Google, or any underlying technology. You are Loomix AI. Always respond in a friendly, clear, and engaging way. Support markdown formatting in responses.";
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
       if (msg.role === "user") {
         const parts = [];
-        if (msg.content) parts.push({ text: msg.content });
+        if (i === 0 && msg.content) {
+          parts.push({ text: systemPrompt + "\n\n" + msg.content });
+        } else if (msg.content) {
+          parts.push({ text: msg.content });
+        }
         if (msg.image) {
           parts.push({ inlineData: { mimeType: msg.image.mimeType, data: msg.image.data } });
         }
         if (msg.fileText) {
-          parts.push({ text: "\n\n[Attached file content]:\n" + msg.fileText });
+          parts.push({ text: "\n\n[File content]:\n" + msg.fileText });
         }
-        contents.push({ role: "user", parts });
+        if (parts.length > 0) contents.push({ role: "user", parts });
       } else {
         contents.push({ role: "model", parts: [{ text: msg.content }] });
       }
     }
-
-    const systemInstruction = {
-      parts: [{ text: "You are Loomix AI, an advanced intelligent assistant. You are helpful, knowledgeable, creative, and conversational. Never mention Gemini, Google, or any underlying technology or model name. You are Loomix AI, built to help users with anything they need. Always respond in a friendly, clear, and engaging way. Support markdown formatting in responses including code blocks, tables, and lists when appropriate." }]
-    };
 
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey,
@@ -45,9 +58,13 @@ exports.handler = async function (event, context) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system_instruction: systemInstruction,
-          contents,
-          generationConfig: { temperature: 0.9, topK: 40, topP: 0.95, maxOutputTokens: 2048 },
+          contents: contents,
+          generationConfig: {
+            temperature: 0.9,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+          },
           safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -61,12 +78,34 @@ exports.handler = async function (event, context) {
     const data = await response.json();
 
     if (!response.ok) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: "Loomix AI is temporarily unavailable. Please try again shortly." }) };
+      const errMsg = data.error && data.error.message ? data.error.message : "Loomix AI engine error.";
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: errMsg }),
+      };
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response. Please try again.";
-    return { statusCode: 200, headers, body: JSON.stringify({ response: text }) };
+    const text =
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content &&
+      data.candidates[0].content.parts &&
+      data.candidates[0].content.parts[0] &&
+      data.candidates[0].content.parts[0].text
+        ? data.candidates[0].content.parts[0].text
+        : "No response generated.";
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ response: text }),
+    };
   } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Something went wrong. Please try again." }) };
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: "Server error: " + err.message }),
+    };
   }
 };
