@@ -15,7 +15,7 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDNpD3ffaRzInMfI1rMrrnzFn9jO5Nv0AY";
 
     if (!apiKey) {
       return {
