@@ -32,7 +32,7 @@ body{
 #splash{
   position:fixed;inset:0;z-index:9999;background:var(--bg);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
-  transition:opacity 0.5s ease, transform 0.5s ease;
+  
 }
 #splash.gone{opacity:0;transform:scale(1.03);pointer-events:none}
 .sp-logo{width:140px;height:auto;filter:drop-shadow(0 0 18px rgba(139,92,246,0.55)) drop-shadow(0 0 36px rgba(34,211,238,0.25));animation:spFloat 2.5s ease infinite alternate}
@@ -77,20 +77,20 @@ body{
 .gt2{display:inline-block;background:linear-gradient(90deg,var(--c2) 0%,var(--p3) 40%,var(--pk) 75%,var(--c2) 100%);background-size:300% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gAnim 4s 1.2s ease infinite}
 
 /* TICKER — fixed alignment */
-.ticker-row{display:flex;align-items:center;flex-wrap:nowrap;gap:5px;margin:9px 0 13px;overflow:hidden;height:1.35em;line-height:1.35}
-.tk-s{font-size:clamp(0.88rem,2.9vw,1.15rem);font-weight:600;color:var(--tx2);white-space:nowrap;flex-shrink:0;line-height:1.35}
-.tk-slot{height:1.35em;overflow:hidden;flex-shrink:0;width:90px}
+.ticker-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px 6px;margin:9px 0 13px;line-height:1.4}
+.tk-s{font-size:16px;font-weight:600;color:var(--tx2);white-space:nowrap;flex-shrink:0;line-height:28px}
+.tk-slot{height:28px;overflow:hidden;flex-shrink:0;min-width:88px;display:inline-block}
 .tk-reel{display:flex;flex-direction:column;will-change:transform;animation:reel 9.1s cubic-bezier(0.4,0,0.2,1) infinite}
-.tk-reel span{height:1.35em;line-height:1.35;display:flex;align-items:center;font-size:clamp(0.88rem,2.9vw,1.15rem);font-weight:800;background:linear-gradient(90deg,var(--p3),var(--c2),var(--pk),var(--p3));background-size:300% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gAnim 3s ease infinite;white-space:nowrap}
+.tk-reel span{height:28px;line-height:28px;display:block;font-size:16px;font-weight:800;background:linear-gradient(90deg,var(--p3),var(--c2),var(--pk),var(--p3));background-size:300% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gAnim 3s ease infinite;white-space:nowrap}
 @keyframes reel{
-  0%,12%{transform:translateY(0)}
-  14%,25%{transform:translateY(-1.35em)}
-  27%,38%{transform:translateY(-2.7em)}
-  40%,51%{transform:translateY(-4.05em)}
-  53%,64%{transform:translateY(-5.4em)}
-  66%,77%{transform:translateY(-6.75em)}
-  79%,90%{transform:translateY(-8.1em)}
-  92%,100%{transform:translateY(0)}
+  0%,11%{transform:translateY(0)}
+  13%,24%{transform:translateY(-28px)}
+  26%,37%{transform:translateY(-56px)}
+  39%,50%{transform:translateY(-84px)}
+  52%,63%{transform:translateY(-112px)}
+  65%,76%{transform:translateY(-140px)}
+  78%,89%{transform:translateY(-168px)}
+  91%,100%{transform:translateY(0)}
 }
 
 .hsub{font-size:0.84rem;color:var(--tx2);line-height:1.65;max-width:380px;margin-bottom:18px}
@@ -455,8 +455,11 @@ body{
   function removeSplash(){
     if(removed) return;
     removed = true;
-    splash.classList.add('gone');
-    setTimeout(function(){ if(splash.parentNode) splash.parentNode.removeChild(splash); }, 550);
+    // Instant hide - no transition, no delay
+    splash.style.display = 'none';
+    splash.style.opacity = '0';
+    splash.style.pointerEvents = 'none';
+    if(splash.parentNode) splash.parentNode.removeChild(splash);
   }
 
   // Animate progress bar manually — no CSS animation dependency
@@ -466,14 +469,14 @@ body{
       progress = 100;
       bar.style.width = '100%';
       clearInterval(interval);
-      setTimeout(removeSplash, 250);
+      setTimeout(removeSplash, 100);
     } else {
       bar.style.width = progress + '%';
     }
-  }, 90);
+  }, 60);
 
   // Hard timeout fallback — always fires no matter what
-  setTimeout(removeSplash, 2200);
+  setTimeout(removeSplash, 1500);
 })();
 
 // ═══════════════════════════════════════════
@@ -722,7 +725,7 @@ function addAI(text){
   var el=g('msgs'),w=document.createElement('div');w.className='mw ai';
   // Simple markdown rendering without marked.js dependency issue
   var rendered=renderMd(text);
-  w.innerHTML='<div class="av">L</div><div class="bwrap"><div class="bub">'+rendered+'</div><div class="ma"><div class="mab" onclick="cpTxt(this,''+encodeURIComponent(text)+'')">Copy</div></div></div>';
+  w.innerHTML='<div class="av">L</div><div class="bwrap"><div class="bub">'+rendered+'</div><div class="ma"><div class="mab" onclick="cpTxt(this,\'"+encodeURIComponent(text)+"\')">Copy</div></div></div>';
   el.appendChild(w);
   w.querySelectorAll('pre').forEach(function(pre){
     var btn=document.createElement('button');btn.className='ccp';btn.textContent='Copy';
@@ -746,9 +749,7 @@ function renderMd(text){
     .replace(/^## (.+)$/gm,'<h2>$1</h2>')
     .replace(/^### (.+)$/gm,'<h3>$1</h3>')
     .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/
-
-/g,'</p><p>').replace(/^(?!<[hlpuoi])/gm,'')
+    .replace(/\n\n/g,'</p><p>').replace(/^(?!<[hlpuoi])/gm,'')
     .replace(/<li>/g,'<ul><li>').replace(/<\/li>(?![\s\S]*<li>)/g,'</li></ul>');
 }
 
@@ -774,7 +775,7 @@ function saveC(first){
 function renderHist(){
   var el=g('hl');
   if(!convos.length){el.innerHTML='<div class="hempty">No conversations yet.<br>Start chatting to see history here.</div>';return;}
-  el.innerHTML=convos.map(function(c,i){return '<div class="hi" style="animation-delay:'+i*.04+'s" onclick="loadC(''+c.id+'')"><div class="hii">&#128172;</div><div class="hin"><div class="hit">'+esc(c.title)+'</div><div class="him">'+tAgo(c.ts)+' &middot; '+c.count+' msgs</div></div><button class="hd" onclick="askDel(event,''+c.id+'')">&#10005;</button></div>';}).join('');
+  el.innerHTML=convos.map(function(c,i){return '<div class="hi" style="animation-delay:'+i*.04+'s" onclick="loadC(\'"+c.id+"\')"><div class="hii">&#128172;</div><div class="hin"><div class="hit">'+esc(c.title)+'</div><div class="him">'+tAgo(c.ts)+' &middot; '+c.count+' msgs</div></div><button class="hd" onclick="askDel(event,\'"+c.id+"\')">&#10005;</button></div>';}).join('');
 }
 function loadC(id){cid=id;msgs=[];g('msgs').innerHTML='';goChat();toast('Loaded');}
 var delT=null;
@@ -797,8 +798,8 @@ function pF(file){
 function addFP(file,src){
   var el=g('fp');el.classList.add('has');
   var c=document.createElement('div');c.className='fpc';c.dataset.n=file.name;
-  if(src){c.innerHTML='<img src="'+src+'"/><span class="fpn">'+esc(file.name)+'</span><span class="fpr" onclick="rmF(this,''+esc(file.name)+'')">&#10005;</span>';}
-  else{c.innerHTML='<span>&#128196;</span><span class="fpn">'+esc(file.name)+'</span><span class="fpr" onclick="rmF(this,''+esc(file.name)+'')">&#10005;</span>';}
+  if(src){c.innerHTML='<img src="'+src+'"/><span class="fpn">'+esc(file.name)+'</span><span class="fpr" onclick="rmF(this,\'"+esc(file.name)+"\')">&#10005;</span>';}
+  else{c.innerHTML='<span>&#128196;</span><span class="fpn">'+esc(file.name)+'</span><span class="fpr" onclick="rmF(this,\'"+esc(file.name)+"\')">&#10005;</span>';}
   el.appendChild(c);
 }
 function rmF(btn,name){atts=atts.filter(function(a){return a.name!==name;});btn.closest('.fpc').remove();if(!atts.length)clearFP();}
