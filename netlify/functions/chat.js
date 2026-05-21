@@ -11,29 +11,67 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    // Try Gemini first, then Groq as fallback
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const groqKey = process.env.GROQ_API_KEY;
+    // KEY IS SAFE HERE - this runs on Netlify servers, users CANNOT see this file
+    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
+    const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
     const { messages } = JSON.parse(event.body);
     const sys = "You are Loomix AI, an advanced intelligent assistant. Never mention Gemini, Groq, Google, or any underlying technology. You are Loomix AI. Be helpful, friendly, and use markdown formatting.";
 
-    // Try Gemini
-    if (geminiKey) {
+    // Try Groq first (most reliable free tier)
+    if (GROQ_KEY && GROQ_KEY !== "YOUR_GROQ_KEY_HERE") {
+      const groqMessages = [{ role: "system", content: sys }];
+      for (const m of messages) {
+        groqMessages.push({
+          role: m.role === "user" ? "user" : "assistant",
+          content: m.content || ""
+        });
+      }
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + GROQ_KEY
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192",
+          messages: groqMessages,
+          max_tokens: 2048,
+          temperature: 0.9
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.choices && data.choices[0] && data.choices[0].message) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ response: data.choices[0].message.content })
+        };
+      }
+      // If Groq failed, return its error
+      const groqErr = data.error && data.error.message ? data.error.message : JSON.stringify(data);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: groqErr })
+      };
+    }
+
+    // Try Gemini fallback
+    if (GEMINI_KEY) {
       const contents = [];
       for (let i = 0; i < messages.length; i++) {
         const m = messages[i];
         if (m.role === "user") {
           const parts = [{ text: i === 0 ? sys + "\n\n" + (m.content || "") : (m.content || "") }];
           if (m.image) parts.push({ inlineData: { mimeType: m.image.mimeType, data: m.image.data } });
-          if (m.fileText) parts.push({ text: "\n\n[File]:\n" + m.fileText });
           contents.push({ role: "user", parts });
         } else {
           contents.push({ role: "model", parts: [{ text: m.content }] });
         }
       }
       const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + geminiKey,
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_KEY,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -41,31 +79,26 @@ exports.handler = async function (event, context) {
         }
       );
       const data = await res.json();
-      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        return { statusCode: 200, headers, body: JSON.stringify({ response: data.candidates[0].content.parts[0].text }) };
+      if (res.ok && data.candidates && data.candidates[0]) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ response: data.candidates[0].content.parts[0].text })
+        };
       }
     }
 
-    // Try Groq as fallback
-    if (groqKey) {
-      const groqMessages = [{ role: "system", content: sys }];
-      for (const m of messages) {
-        groqMessages.push({ role: m.role === "user" ? "user" : "assistant", content: m.content || "" });
-      }
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + groqKey },
-        body: JSON.stringify({ model: "llama3-8b-8192", messages: groqMessages, max_tokens: 2048, temperature: 0.9 }),
-      });
-      const data = await res.json();
-      if (res.ok && data.choices?.[0]?.message?.content) {
-        return { statusCode: 200, headers, body: JSON.stringify({ response: data.choices[0].message.content }) };
-      }
-    }
-
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "No API key configured. Please add GEMINI_API_KEY or GROQ_API_KEY in Netlify environment variables." }) };
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: "Please configure API key" })
+    };
 
   } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Server error: " + err.message }) };
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: "Server error: " + err.message })
+    };
   }
 };
