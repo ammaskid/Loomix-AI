@@ -11,7 +11,7 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
+    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
 
     const { messages } = JSON.parse(event.body);
     const sys = "You are Loomix AI, an advanced intelligent assistant. Never mention Gemini, Groq, Google, or any underlying technology. You are Loomix AI. Be helpful, friendly, and use markdown formatting.";
@@ -31,7 +31,7 @@ exports.handler = async function (event, context) {
         "Authorization": "Bearer " + GROQ_KEY.trim()
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.1-8b-instant",
         messages: groqMessages,
         max_tokens: 2048,
         temperature: 0.9
