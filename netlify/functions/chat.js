@@ -11,7 +11,7 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
+    const GROQ_KEY = "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";
 
     const { messages } = JSON.parse(event.body);
     const sys = "You are Loomix AI, an advanced intelligent assistant. Never mention Gemini, Groq, Google, or any underlying technology. You are Loomix AI. Be helpful, friendly, and use markdown formatting.";
@@ -28,7 +28,7 @@ exports.handler = async function (event, context) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + GROQ_KEY.trim()
+        "Authorization": "Bearer " + GROQ_KEY
       },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
@@ -48,13 +48,10 @@ exports.handler = async function (event, context) {
       };
     }
 
-    // Return exact Groq error so we can debug
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
-        error: data.error ? data.error.message : ("Groq error: " + JSON.stringify(data))
-      })
+      body: JSON.stringify({ error: data.error ? data.error.message : JSON.stringify(data) })
     };
 
   } catch (err) {
