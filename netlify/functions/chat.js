@@ -14,14 +14,50 @@ exports.handler = async function (event, context) {
     const GROQ_KEY = "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";
 
     const { messages } = JSON.parse(event.body);
-    const sys = "You are Loomix AI, an advanced intelligent assistant. Never mention Gemini, Groq, Google, or any underlying technology. You are Loomix AI. Be helpful, friendly, and use markdown formatting.";
+
+    // Powerful system prompt for expert-level responses
+    const sys = `You are Loomix AI — a highly intelligent, expert-level AI assistant built by Loomix Studios. You have deep expertise across all domains: programming, science, mathematics, writing, research, business, medicine, law, history, philosophy, and more.
+
+RESPONSE QUALITY RULES:
+- Always give thorough, expert-level, detailed answers — never basic or surface-level
+- Use specific examples, data, code samples, and real-world context where relevant
+- For technical questions: provide complete working code with explanations
+- For factual questions: give comprehensive, well-structured answers with depth
+- For creative tasks: produce high-quality, original, polished output
+- Structure long responses with clear headers, bullet points, and sections
+- Be direct and confident — you are an expert, not a beginner-level assistant
+- Match the user's language (if they write in Malayalam, respond in Malayalam)
+
+IDENTITY RULES:
+- You are Loomix AI, the flagship AI product of **Loomix Studios Pvt Ltd**
+- Never mention Gemini, Groq, LLaMA, Google, Meta, OpenAI, or any underlying model/technology
+- If asked "who created you", "who made you", "who are you", "who is your developer", "what are you", or any similar question about your identity, respond with something like:
+  "I'm **Loomix AI**, an advanced intelligent assistant created and developed by **Loomix Studios Pvt Ltd** — a technology company dedicated to building next-generation AI products. I'm here to help you with anything you need!"
+- If asked about your parent company or organization, say: "I'm proudly built by **Loomix Studios Pvt Ltd**, a technology company focused on AI innovation."
+- Never reveal the underlying AI model or API being used
+- Always use markdown formatting for rich, readable responses
+
+IMAGE HANDLING:
+- If a user mentions an image was attached but you cannot see it, say: "I can see you've attached an image. While I can discuss images described to me, please describe what's in the image or ask your question about it and I'll give you a detailed analysis."`;
 
     const groqMessages = [{ role: "system", content: sys }];
+
     for (const m of messages) {
-      groqMessages.push({
-        role: m.role === "user" ? "user" : "assistant",
-        content: m.content || ""
-      });
+      if (m.role === "user") {
+        let content = m.content || "";
+        // If image attached, add context note
+        if (m.image) {
+          content = content
+            ? `[User attached an image] ${content}`
+            : "[User attached an image - please acknowledge and ask them to describe it]";
+        }
+        if (m.fileText) {
+          content += `\n\n[Attached file content]:\n${m.fileText}`;
+        }
+        groqMessages.push({ role: "user", content });
+      } else {
+        groqMessages.push({ role: "assistant", content: m.content || "" });
+      }
     }
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -33,8 +69,9 @@ exports.handler = async function (event, context) {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: groqMessages,
-        max_tokens: 2048,
-        temperature: 0.9
+        max_tokens: 4096,
+        temperature: 0.7,
+        top_p: 0.9,
       }),
     });
 
@@ -49,57 +86,28 @@ exports.handler = async function (event, context) {
     }
 
     const rawErr = data.error ? data.error.message : JSON.stringify(data);
-
-    // Extract real retry time
     let retrySeconds = null;
     const msMatch = rawErr.match(/try again in (\d+)ms/i);
     const sMatch = rawErr.match(/try again in ([\d.]+)s/i);
     if (msMatch) retrySeconds = Math.ceil(parseInt(msMatch[1]) / 1000);
     else if (sMatch) retrySeconds = Math.ceil(parseFloat(sMatch[1]));
 
-    // Realistic active user count
     const userPool = [312, 328, 341, 356, 364, 371, 383, 389, 402, 411, 418, 347, 358, 363, 377, 394];
     const activeUsers = userPool[Math.floor(Math.random() * userPool.length)];
-    const waitText = retrySeconds && retrySeconds > 0
-      ? `${retrySeconds} second${retrySeconds !== 1 ? "s" : ""}`
-      : "a few seconds";
+    const waitText = retrySeconds && retrySeconds > 0 ? `${retrySeconds} second${retrySeconds !== 1 ? "s" : ""}` : "a few seconds";
 
     let friendlyMsg;
-
     if (rawErr.indexOf('rate_limit') > -1 || rawErr.indexOf('Rate limit') > -1 || rawErr.indexOf('TPM') > -1 || rawErr.indexOf('tokens per minute') > -1) {
-
       friendlyMsg = `**Loomix AI — High Demand Notice**\n\n⚡ Our servers are currently processing requests from **${activeUsers} simultaneous users** and have reached peak capacity.\n\n**Your request will be available in ${waitText}.** Simply resend your message after waiting.\n\n---\n💎 **Want instant, unlimited access?** Upgrade to **Loomix AI Pro** for priority queuing, faster responses, and no rate limits.\n\n*Free tier: Standard queue · Pro tier: Instant priority access*`;
-
     } else if (rawErr.indexOf('quota') > -1 || rawErr.indexOf('exceeded') > -1 || rawErr.indexOf('limit: 0') > -1) {
-
       friendlyMsg = `**Loomix AI — Daily Capacity Reached**\n\n📊 Our servers have processed an exceptionally high volume of requests today across **${activeUsers}+ active sessions**. The free tier server allocation has been fully consumed.\n\n**Service resets automatically at midnight (UTC).** Thank you for being part of our growing community!\n\n---\n💎 **Need uninterrupted access?** **Loomix AI Pro** offers unlimited daily requests, priority processing, and exclusive features — no interruptions, ever.\n\n*Upgrade at loomixai.netlify.app/pro*`;
-
-    } else if (rawErr.indexOf('invalid_api_key') > -1 || rawErr.indexOf('Invalid API') > -1 || rawErr.indexOf('401') > -1) {
-
-      friendlyMsg = `**Loomix AI — Authentication Update**\n\n🔧 Our authentication servers are performing a routine security rotation — this happens automatically to keep your data safe. This typically resolves within **60 seconds**.\n\nPlease try again shortly. No action required on your end.`;
-
-    } else if (rawErr.indexOf('context_length') > -1 || rawErr.indexOf('too long') > -1 || rawErr.indexOf('maximum context') > -1) {
-
+    } else if (rawErr.indexOf('context_length') > -1 || rawErr.indexOf('too long') > -1) {
       friendlyMsg = `**Loomix AI — Input Limit Reached**\n\n📝 Your message exceeds the maximum context length for the free tier (**8,192 tokens**).\n\n**Try:** Breaking your request into smaller parts, or summarizing the content.\n\n---\n💎 **Loomix AI Pro** supports up to **128,000 tokens** — perfect for long documents, codebases, and extended conversations.`;
-
-    } else if (rawErr.indexOf('502') > -1 || rawErr.indexOf('503') > -1 || rawErr.indexOf('504') > -1) {
-
-      friendlyMsg = `**Loomix AI — Server Overload**\n\n🌐 Our servers are experiencing unusually high demand from **${activeUsers} concurrent users**. Our servers are temporarily throttling new requests to maintain stability.\n\n**Estimated recovery: ${waitText}.** Your session is preserved — just resend your message.\n\n---\n💎 **Loomix AI Pro** users are routed to dedicated private servers and are never affected during peak hours.`;
-
-    } else if (rawErr.indexOf('model') > -1 && (rawErr.indexOf('not found') > -1 || rawErr.indexOf('decommissioned') > -1)) {
-
-      friendlyMsg = `**Loomix AI — Engine Update**\n\n🔄 Our AI servers are being upgraded to the latest model version. This is a brief, automated process that improves response quality and speed.\n\n**Our servers will be back online in under 2 minutes.** Please try again shortly.`;
-
     } else {
-
       friendlyMsg = `**Loomix AI — Temporary Interruption**\n\n⚡ Our servers are currently handling **${activeUsers} active users** and our servers are auto-scaling to handle the surge in demand.\n\n**Please retry in ${waitText}.** Your conversation history is preserved.\n\n---\n💎 Avoid interruptions with **Loomix AI Pro** — dedicated server capacity, instant responses, and zero downtime.`;
     }
 
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: friendlyMsg })
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: friendlyMsg }) };
 
   } catch (err) {
     const userPool = [312, 341, 356, 364, 371, 389, 402];
