@@ -10,63 +10,62 @@ exports.handler = async function (event, context) {
     return { statusCode: 200, headers, body: "" };
   }
 
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
-  }
-
   try {
+    // Try Gemini first, then Groq as fallback
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
+
     const { messages } = JSON.parse(event.body);
-    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyAHHfD4CwS-qV5CRfSi3TN7RW7UHvsnYNA";
+    const sys = "You are Loomix AI, an advanced intelligent assistant. Never mention Gemini, Groq, Google, or any underlying technology. You are Loomix AI. Be helpful, friendly, and use markdown formatting.";
 
-    const contents = [];
-    for (const msg of messages) {
-      if (msg.role === "user") {
-        const parts = [];
-        if (msg.content) parts.push({ text: msg.content });
-        if (msg.image) {
-          parts.push({ inlineData: { mimeType: msg.image.mimeType, data: msg.image.data } });
+    // Try Gemini
+    if (geminiKey) {
+      const contents = [];
+      for (let i = 0; i < messages.length; i++) {
+        const m = messages[i];
+        if (m.role === "user") {
+          const parts = [{ text: i === 0 ? sys + "\n\n" + (m.content || "") : (m.content || "") }];
+          if (m.image) parts.push({ inlineData: { mimeType: m.image.mimeType, data: m.image.data } });
+          if (m.fileText) parts.push({ text: "\n\n[File]:\n" + m.fileText });
+          contents.push({ role: "user", parts });
+        } else {
+          contents.push({ role: "model", parts: [{ text: m.content }] });
         }
-        if (msg.fileText) {
-          parts.push({ text: "\n\n[Attached file content]:\n" + msg.fileText });
+      }
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + geminiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents, generationConfig: { temperature: 0.9, maxOutputTokens: 2048 } }),
         }
-        contents.push({ role: "user", parts });
-      } else {
-        contents.push({ role: "model", parts: [{ text: msg.content }] });
+      );
+      const data = await res.json();
+      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return { statusCode: 200, headers, body: JSON.stringify({ response: data.candidates[0].content.parts[0].text }) };
       }
     }
 
-    const systemInstruction = {
-      parts: [{ text: "You are Loomix AI, an advanced intelligent assistant. You are helpful, knowledgeable, creative, and conversational. Never mention Gemini, Google, or any underlying technology or model name. You are Loomix AI, built to help users with anything they need. Always respond in a friendly, clear, and engaging way. Support markdown formatting in responses including code blocks, tables, and lists when appropriate." }]
-    };
-
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
-      {
+    // Try Groq as fallback
+    if (groqKey) {
+      const groqMessages = [{ role: "system", content: sys }];
+      for (const m of messages) {
+        groqMessages.push({ role: m.role === "user" ? "user" : "assistant", content: m.content || "" });
+      }
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: systemInstruction,
-          contents,
-          generationConfig: { temperature: 0.9, topK: 40, topP: 0.95, maxOutputTokens: 2048 },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          ],
-        }),
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + groqKey },
+        body: JSON.stringify({ model: "llama3-8b-8192", messages: groqMessages, max_tokens: 2048, temperature: 0.9 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.choices?.[0]?.message?.content) {
+        return { statusCode: 200, headers, body: JSON.stringify({ response: data.choices[0].message.content }) };
       }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: "Loomix AI is temporarily unavailable. Please try again shortly." }) };
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response. Please try again.";
-    return { statusCode: 200, headers, body: JSON.stringify({ response: text }) };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: "No API key configured. Please add GEMINI_API_KEY or GROQ_API_KEY in Netlify environment variables." }) };
+
   } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Something went wrong. Please try again." }) };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: "Server error: " + err.message }) };
   }
 };
