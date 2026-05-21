@@ -12,7 +12,7 @@ exports.handler = async function (event, context) {
 
   try {
     // KEY IS SAFE HERE - this runs on Netlify servers, users CANNOT see this file
-    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
+    const GROQ_KEY = process.env.GROQ_API_KEY || "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";
     const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
     const { messages } = JSON.parse(event.body);
