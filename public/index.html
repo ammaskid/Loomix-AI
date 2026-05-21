@@ -880,7 +880,7 @@ function runDemo(){
   d.style.cssText='display:flex;gap:7px;align-items:flex-end;margin-bottom:8px;'+(m.r==='user'?'flex-direction:row-reverse':'');
   var av=document.createElement('div');
   av.style.cssText='width:24px;height:24px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;background:'+(m.r==='ai'?'linear-gradient(135deg,#6d28d9,#0891b2)':'rgba(255,255,255,0.08)')+';color:'+(m.r==='ai'?'#fff':'rgba(255,255,255,0.5)');
-  av.textContent=m.r==='ai'?'L':'U';
+  if(m.r==='ai'){var dimg=document.createElement('img');dimg.src=LOGO_DATA;dimg.style.cssText='width:100%;height:100%;object-fit:contain;padding:2px;filter:drop-shadow(0 0 3px rgba(109,40,217,0.5))';av.appendChild(dimg);}else{av.textContent='U';}
   var bub=document.createElement('div');
   bub.style.cssText='padding:9px 12px;border-radius:'+( m.r==='ai'?'14px 14px 14px 4px':'14px 14px 4px 14px')+';font-size:12px;line-height:1.5;max-width:85%;opacity:0;transform:translateY(6px);transition:all .35s ease;background:'+(m.r==='ai'?'rgba(255,255,255,0.05)':'linear-gradient(135deg,#6d28d9,#5b21b6)')+';border:'+(m.r==='ai'?'1px solid rgba(255,255,255,0.08)':'none')+';color:'+(m.r==='ai'?'rgba(240,238,255,0.9)':'#fff');
   bub.textContent=m.t;
@@ -985,14 +985,21 @@ function addAI(text,isErr){
   mab.onclick=(function(t){return function(){cpTxt(mab,encodeURIComponent(t));};})(text);
   if(!isErr)ma.appendChild(mab);
   bwrap.appendChild(bub);if(!isErr)bwrap.appendChild(ma);
-  w.innerHTML='<div class="mav">L</div>';w.appendChild(bwrap);
+  var lav=document.createElement('div');lav.className='mav';var lavimg=document.createElement('img');lavimg.src=LOGO_DATA;lavimg.style.cssText='width:100%;height:100%;object-fit:contain;padding:3px;filter:drop-shadow(0 0 4px rgba(109,40,217,0.5))';lav.appendChild(lavimg);w.appendChild(lav);w.appendChild(bwrap);
   el.appendChild(w);
   w.querySelectorAll('pre').forEach(function(pre){var btn=document.createElement('button');btn.className='ccp';btn.textContent='Copy';btn.onclick=function(){navigator.clipboard.writeText(pre.querySelector('code')?pre.querySelector('code').textContent:pre.textContent);btn.textContent='\u2713';setTimeout(function(){btn.textContent='Copy';},1800);};pre.style.position='relative';pre.appendChild(btn);});
   scrollB();
 }
 function addTyping(){
   var el=g('msgs'),w=document.createElement('div');w.className='tw';
-  w.innerHTML='<div class="mav" style="background:linear-gradient(135deg,#6d28d9,#0891b2);color:#fff;box-shadow:0 2px 8px rgba(109,40,217,0.4);">L</div><div class="tbub"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
+  var tav=document.createElement('div');tav.className='mav';
+  tav.style.cssText='border:1px solid rgba(109,40,217,0.3);background:transparent;overflow:hidden;';
+  var tavimg=document.createElement('img');tavimg.src=LOGO_DATA;
+  tavimg.style.cssText='width:100%;height:100%;object-fit:contain;padding:3px;filter:drop-shadow(0 0 4px rgba(109,40,217,0.5))';
+  tav.appendChild(tavimg);
+  var tbub=document.createElement('div');tbub.className='tbub';
+  tbub.innerHTML='<div class="td"></div><div class="td"></div><div class="td"></div>';
+  w.appendChild(tav);w.appendChild(tbub);
   el.appendChild(w);scrollB();return w;
 }
 function scrollB(){var el=g('msgs');if(el)el.scrollTo({top:el.scrollHeight,behavior:'smooth'});}
