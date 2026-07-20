@@ -37,7 +37,7 @@ loomix-ai/
 
 ---
 
-## ✅ Step 2 — Upload to GitHub
+## ✅ Step 2 — Upload to GitHub .
 
 ### Option A: GitHub Website (No coding needed)
 
